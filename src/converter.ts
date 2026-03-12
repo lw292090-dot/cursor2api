@@ -640,7 +640,13 @@ export function parseToolCalls(responseText: string): {
                     blocksToRemove.push({ start: blockStart, end: closingPos + 3 });
                 }
             } catch (e) {
-                console.error('[Converter] tolerantParse 失败:', e);
+                // 仅当内容看起来像工具调用时才报 error，否则可能只是普通 JSON 代码块（代码示例等）
+                const looksLikeToolCall = /["'](?:tool|name)["']\s*:/.test(jsonContent);
+                if (looksLikeToolCall) {
+                    console.error('[Converter] tolerantParse 失败（疑似工具调用）:', e);
+                } else {
+                    console.warn(`[Converter] 跳过非工具调用的 json 代码块 (${jsonContent.length} chars)`);
+                }
             }
         } else {
             // 没有闭合 ``` — 代码块被截断，尝试解析已有内容

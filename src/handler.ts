@@ -728,7 +728,14 @@ Continue EXACTLY from where you stopped. DO NOT repeat any content already gener
                 // We must send the remaining unsent fullResponse.
                 let textToSend = fullResponse;
 
-                if (isRefusal(fullResponse)) {
+                // ★ 仅对短响应或开头明确匹配拒绝模式的响应进行压制
+                // 长响应（如模型在写报告）中可能碰巧包含某个宽泛的拒绝关键词，不应被误判
+                // 截断响应（stopReason=max_tokens）一定不是拒绝
+                const isShortResponse = fullResponse.trim().length < 500;
+                const startsWithRefusal = isRefusal(fullResponse.substring(0, 300));
+                const isActualRefusal = stopReason !== 'max_tokens' && (isShortResponse ? isRefusal(fullResponse) : startsWithRefusal);
+
+                if (isActualRefusal) {
                     console.log(`[Handler] Supressed complete refusal without tools: ${fullResponse.substring(0, 100)}...`);
                     textToSend = 'I understand the request. Let me proceed with the appropriate action. Could you clarify what specific task you would like me to perform?';
                 }
@@ -859,7 +866,11 @@ async function handleNonStream(res: Response, cursorReq: CursorChatRequest, body
             }
         } else {
             let textToSend = fullText;
-            if (isRefusal(fullText)) {
+            // ★ 同样仅对短响应或开头匹配的进行拒绝压制
+            const isShort = fullText.trim().length < 500;
+            const startsRefusal = isRefusal(fullText.substring(0, 300));
+            const isRealRefusal = stopReason !== 'max_tokens' && (isShort ? isRefusal(fullText) : startsRefusal);
+            if (isRealRefusal) {
                 console.log(`[Handler] Supressed pure text refusal (non-stream): ${fullText.substring(0, 100)}...`);
                 textToSend = 'Let me proceed with the task.';
             }
