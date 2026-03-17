@@ -329,6 +329,14 @@ export async function convertToCursorRequest(req: AnthropicRequest): Promise<Cur
 
                 actualQuery = actualQuery.trim();
 
+                // ★ 压缩后空 query 检测：CC 自动压缩后，整条消息可能全是 XML 标签
+                // （如 <system-reminder>压缩的上下文摘要</system-reminder>）
+                // 剥离后 actualQuery 为空，模型完全看不到任务上下文 → 回退：不分离标签
+                if (tagsPrefix && actualQuery.length < 20) {
+                    actualQuery = tagsPrefix + (actualQuery ? '\n' + actualQuery : '');
+                    tagsPrefix = '';
+                }
+
                 // ★ 判断是否是最后一条用户消息（模型即将回答的那条）
                 const isLastUserMsg = !req.messages.slice(i + 1).some(m => m.role === 'user');
                 const thinkingSuffix = (thinkingEnabled && isLastUserMsg)
@@ -553,7 +561,7 @@ function extractToolResultNatural(msg: AnthropicMessage): string {
     }
 
     const result = parts.join('\n\n');
-    return `${result}\n\nBased on the output above, continue with the next appropriate action using the structured format.`;
+    return `${result}\n\nBased on the output above, continue working on the task described in the conversation context. Do NOT stop or ask what to do — review the prior context and proceed with the next appropriate action using the structured format.`;
 }
 
 /**
