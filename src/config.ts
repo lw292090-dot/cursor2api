@@ -5,7 +5,26 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = join(__dirname, '..', '..', 'config.yaml');
+
+// 尝试多个可能的路径（Vercel 和本地环境）
+function getConfigPath(): string | null {
+    const possiblePaths = [
+        join(process.cwd(), 'config.yaml'),
+        join(__dirname, '..', '..', 'config.yaml'),
+        join(process.cwd(), '..', 'config.yaml'),
+    ];
+
+    for (const p of possiblePaths) {
+        if (existsSync(p)) {
+            console.log(`[Config] 找到配置文件: ${p}`);
+            return p;
+        }
+    }
+    console.log('[Config] 未找到 config.yaml，尝试的路径:', possiblePaths);
+    return null;
+}
+
+const CONFIG_PATH = getConfigPath();
 
 let config: AppConfig;
 let watcher: FSWatcher | null = null;
@@ -29,7 +48,7 @@ function parseYamlConfig(defaults: AppConfig): { config: AppConfig; raw: Record<
     const result = { ...defaults, fingerprint: { ...defaults.fingerprint } };
     let raw: Record<string, unknown> | null = null;
 
-    if (!existsSync(CONFIG_PATH)) return { config: result, raw };
+    if (!CONFIG_PATH || !existsSync(CONFIG_PATH)) return { config: result, raw };
 
     try {
         const content = readFileSync(CONFIG_PATH, 'utf-8');
@@ -285,22 +304,22 @@ export function getConfig(): AppConfig {
  * 环境变量覆盖始终保持最高优先级，不受热重载影响。
  */
 export function initConfigWatcher(): void {
-    if (watcher) return; // 避免重复初始化
-    if (!existsSync(CONFIG_PATH)) {
+    if (watcher) return;
+    if (!CONFIG_PATH || !existsSync(CONFIG_PATH)) {
         console.log('[Config] config.yaml 不存在，跳过热重载监听');
         return;
     }
 
     const DEBOUNCE_MS = 500;
 
-    watcher = watch(CONFIG_PATH, (eventType) => {
+    watcher = watch(CONFIG_PATH!, (eventType) => {
         if (eventType !== 'change') return;
 
         // 防抖：多次快速写入只触发一次重载
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             try {
-                if (!existsSync(CONFIG_PATH)) {
+                if (!CONFIG_PATH || !existsSync(CONFIG_PATH)) {
                     console.warn('[Config] ⚠️  config.yaml 已被删除，保持当前配置');
                     return;
                 }
