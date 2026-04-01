@@ -1,6 +1,11 @@
 import { readFileSync, existsSync, watch, type FSWatcher } from 'fs';
 import { parse as parseYaml } from 'yaml';
 import type { AppConfig } from './types.js';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CONFIG_PATH = join(__dirname, '..', '..', 'config.yaml');
 
 let config: AppConfig;
 let watcher: FSWatcher | null = null;
@@ -24,10 +29,10 @@ function parseYamlConfig(defaults: AppConfig): { config: AppConfig; raw: Record<
     const result = { ...defaults, fingerprint: { ...defaults.fingerprint } };
     let raw: Record<string, unknown> | null = null;
 
-    if (!existsSync('config.yaml')) return { config: result, raw };
+    if (!existsSync(CONFIG_PATH)) return { config: result, raw };
 
     try {
-        const content = readFileSync('config.yaml', 'utf-8');
+        const content = readFileSync(CONFIG_PATH, 'utf-8');
         const yaml = parseYaml(content);
         raw = yaml;
 
@@ -281,21 +286,21 @@ export function getConfig(): AppConfig {
  */
 export function initConfigWatcher(): void {
     if (watcher) return; // 避免重复初始化
-    if (!existsSync('config.yaml')) {
+    if (!existsSync(CONFIG_PATH)) {
         console.log('[Config] config.yaml 不存在，跳过热重载监听');
         return;
     }
 
     const DEBOUNCE_MS = 500;
 
-    watcher = watch('config.yaml', (eventType) => {
+    watcher = watch(CONFIG_PATH, (eventType) => {
         if (eventType !== 'change') return;
 
         // 防抖：多次快速写入只触发一次重载
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
             try {
-                if (!existsSync('config.yaml')) {
+                if (!existsSync(CONFIG_PATH)) {
                     console.warn('[Config] ⚠️  config.yaml 已被删除，保持当前配置');
                     return;
                 }

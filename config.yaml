@@ -81,7 +81,7 @@ max_history_tokens: 120000
 # 不配置此项时: 跟随客户端请求（Anthropic API 看 thinking 参数，OpenAI API 看模型名/reasoning_effort）
 # 环境变量: THINKING_ENABLED=true|false
 thinking:
-  enabled: false
+  enabled: true
 
 # ==================== 历史消息压缩配置 ====================
 # 对话过长时自动压缩早期消息，释放输出空间，防止 Cursor 上下文溢出
